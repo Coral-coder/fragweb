@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FragWeb Arena</title>
+  <meta name="description" content="A browser-based LAN arena shooter. No install — one player hosts, everyone else joins with a room code.">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+  </script>
+</head>
+<body>
+  <canvas id="view"></canvas>
+
+  <!-- ===================== MAIN MENU ===================== -->
+  <div id="menu" class="screen">
+    <div class="panel">
+      <h1>FRAG<span>WEB</span></h1>
+      <p class="tag">Arena deathmatch in your browser. No install. Grab your friends.</p>
+
+      <label class="row">Your name
+        <input id="name" maxlength="16" placeholder="Player" autocomplete="off">
+      </label>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="host">Host a game</button>
+        <button class="tab" data-tab="join">Join a game</button>
+      </div>
+
+      <div class="tabpane" id="tab-host">
+        <div class="grid2">
+          <label>Mode
+            <select id="mode">
+              <option value="ffa">Deathmatch (free-for-all)</option>
+              <option value="tdm">Team Deathmatch</option>
+            </select>
+          </label>
+          <label>Bots
+            <input id="bots" type="number" min="0" max="10" value="3">
+          </label>
+          <label>Frag limit
+            <input id="fraglimit" type="number" min="5" max="200" value="25">
+          </label>
+          <label>Time limit (min)
+            <input id="timelimit" type="number" min="1" max="60" value="10">
+          </label>
+        </div>
+        <button id="btn-host" class="primary">Host game</button>
+        <button id="btn-practice" class="secondary">Practice offline (just you + bots)</button>
+      </div>
+
+      <div class="tabpane hidden" id="tab-join">
+        <label class="row">Room code
+          <input id="code" maxlength="5" placeholder="ABCDE" autocomplete="off" style="text-transform:uppercase">
+        </label>
+        <button id="btn-join" class="primary">Join game</button>
+      </div>
+
+      <p id="status" class="status"></p>
+
+      <details class="help">
+        <summary>Controls &amp; how it works</summary>
+        <ul>
+          <li><b>WASD</b> move · <b>Mouse</b> look · <b>Space</b> jump · <b>Click</b> fire</li>
+          <li><b>1–5</b> or <b>wheel</b> switch weapons · <b>Tab</b> scores · <b>T</b> chat · <b>Esc</b> menu</li>
+          <li>Rocket-jump: look down, jump and fire at your feet.</li>
+          <li>The host's browser runs the match. Keep the host's game open for the whole session.</li>
+          <li>Everyone needs internet briefly to find each other; gameplay then goes directly between the PCs.</li>
+        </ul>
+      </details>
+    </div>
+  </div>
+
+  <!-- ===================== IN-GAME HUD ===================== -->
+  <div id="hud" class="hidden">
+    <div id="crosshair"></div>
+    <div id="hitmarker"></div>
+    <div id="damage"></div>
+    <div id="topbar">
+      <span id="timer">10:00</span>
+      <span id="myscore"></span>
+    </div>
+    <div id="room"></div>
+    <div id="killfeed"></div>
+    <div id="center-msg"></div>
+    <div id="pickup-msg"></div>
+    <div id="chatlog"></div>
+    <input id="chatin" class="hidden" maxlength="120" placeholder="Say something… (Enter to send, Esc to cancel)">
+    <div id="vitals">
+      <div class="stat"><small>HEALTH</small><b id="hp">100</b></div>
+      <div class="stat armor"><small>ARMOR</small><b id="ar">0</b></div>
+    </div>
+    <div id="weapons"></div>
+    <div id="ammo"><small id="wname">Sidearm</small><b id="ammocount">∞</b></div>
+    <div id="dead" class="hidden"><h2>FRAGGED</h2><p id="deadby"></p><p id="respawn"></p></div>
+    <div id="scoreboard" class="hidden"></div>
+    <div id="clicktoplay" class="hidden">Click to play</div>
+  </div>
+
+  <!-- ===================== PAUSE MENU ===================== -->
+  <div id="pause" class="screen hidden">
+    <div class="panel small">
+      <h2>Paused</h2>
+      <div id="pause-room"></div>
+      <button id="btn-resume" class="primary">Resume</button>
+      <label class="row">Mouse sensitivity <input id="sens" type="range" min="0.2" max="4" step="0.05" value="1"></label>
+      <label class="row">Field of view <input id="fov" type="range" min="70" max="110" step="1" value="95"></label>
+      <label class="row">Volume <input id="vol" type="range" min="0" max="1" step="0.05" value="0.6"></label>
+      <div id="host-tools" class="hidden">
+        <button id="btn-addbot" class="secondary">Add bot</button>
+        <button id="btn-kickbot" class="secondary">Remove bot</button>
+      </div>
+      <button id="btn-leave" class="danger">Leave game</button>
+    </div>
+  </div>
+
+  <script type="module" src="js/client.js"></script>
+</body>
+</html>
