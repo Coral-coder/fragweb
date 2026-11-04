@@ -8,7 +8,10 @@
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script type="importmap">
-    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    } }
   </script>
 </head>
 <body>
@@ -83,6 +86,7 @@
       <span id="myscore"></span>
     </div>
     <div id="room"></div>
+    <div id="fps"></div>
     <div id="killfeed"></div>
     <div id="center-msg"></div>
     <div id="pickup-msg"></div>
@@ -105,6 +109,13 @@
       <h2>Paused</h2>
       <div id="pause-room"></div>
       <button id="btn-resume" class="primary">Resume</button>
+      <label class="row">Graphics quality
+        <select id="quality">
+          <option value="high">High (glow effects, sharp shadows)</option>
+          <option value="medium">Medium (faster)</option>
+          <option value="low">Low (fastest, for older PCs)</option>
+        </select>
+      </label>
       <label class="row">Mouse sensitivity <input id="sens" type="range" min="0.2" max="4" step="0.05" value="1"></label>
       <label class="row">Field of view <input id="fov" type="range" min="70" max="110" step="1" value="95"></label>
       <label class="row">Volume <input id="vol" type="range" min="0" max="1" step="0.05" value="0.6"></label>

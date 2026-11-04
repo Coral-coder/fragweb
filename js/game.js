@@ -1,14 +1,14 @@
 // Shared game rules, map, and physics. Used by both the host simulation and every client.
 
-export const TICK = 1 / 30;
+export const TICK = 1 / 60;
 
 export const PLAYER = {
   half: [0.4, 0.9, 0.4], // collision half-extents (1.8m tall)
   eye: 0.7,              // eye height above body centre
-  speed: 9.5,
-  airAccel: 30,
-  groundAccel: 80,
-  friction: 10,
+  speed: 12.5,
+  airAccel: 40,
+  groundAccel: 110,
+  friction: 9,
   jump: 8.2,
   gravity: 22,
   step: 0.55,
@@ -22,7 +22,7 @@ export const WEAPONS = [
   { id: 0, key: '1', name: 'Sidearm',         kind: 'hit',    dmg: 18, interval: 0.32, spread: 0.004, pellets: 1,  ammo: null,      color: 0x9fe6ff },
   { id: 1, key: '2', name: 'Scattergun',      kind: 'hit',    dmg: 9,  interval: 0.95, spread: 0.07,  pellets: 10, ammo: 'shells',  color: 0xffc46b },
   { id: 2, key: '3', name: 'Pulse Rifle',     kind: 'hit',    dmg: 9,  interval: 0.085,spread: 0.018, pellets: 1,  ammo: 'cells',   color: 0x7dff9b },
-  { id: 3, key: '4', name: 'Rocket Launcher', kind: 'rocket', dmg: 100, splash: 95, radius: 4.2, speed: 30, interval: 0.85, ammo: 'rockets', color: 0xff6a3d },
+  { id: 3, key: '4', name: 'Rocket Launcher', kind: 'rocket', dmg: 100, splash: 95, radius: 4.2, speed: 40, interval: 0.8, ammo: 'rockets', color: 0xff6a3d },
   { id: 4, key: '5', name: 'Rail Lance',      kind: 'hit',    dmg: 90, interval: 1.45, spread: 0,     pellets: 1,  ammo: 'slugs',   color: 0xd27bff },
 ];
 
@@ -221,7 +221,7 @@ export function stepPlayer(body, input, yaw, dt) {
     accelerate(v, wx, wz, PLAYER.speed, PLAYER.groundAccel, dt);
     if (input.jump) { v[1] = PLAYER.jump; body.onGround = false; }
   } else {
-    accelerate(v, wx, wz, PLAYER.speed, PLAYER.airAccel * 0.4, dt);
+    accelerate(v, wx, wz, PLAYER.speed, PLAYER.airAccel * 0.5, dt);
   }
   v[1] -= PLAYER.gravity * dt;
   if (v[1] < -50) v[1] = -50;
@@ -274,6 +274,27 @@ export function rayWorld(o, d, maxDist = 200) {
     if (t < best) best = t;
   }
   return best;
+}
+
+// Like rayWorld but also returns the surface normal of what was hit (null if nothing).
+export function rayWorldHit(o, d, maxDist = 200) {
+  let best = maxDist, hitBox = null;
+  for (const b of MAP.boxes) {
+    const t = rayBox(o, d, b.min, b.max);
+    if (t < best) { best = t; hitBox = b; }
+  }
+  let n = null;
+  if (hitBox) {
+    const p = [o[0] + d[0] * best, o[1] + d[1] * best, o[2] + d[2] * best];
+    let bestErr = Infinity;
+    for (let i = 0; i < 3; i++) {
+      for (const [face, sign] of [[hitBox.min[i], -1], [hitBox.max[i], 1]]) {
+        const err = Math.abs(p[i] - face);
+        if (err < bestErr) { bestErr = err; n = [0, 0, 0]; n[i] = sign; }
+      }
+    }
+  }
+  return { t: best, n };
 }
 
 export function playerBox(p) {

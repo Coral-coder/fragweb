@@ -6,7 +6,7 @@ import {
 } from './game.js';
 
 const BOT_NAMES = ['Vex', 'Cinder', 'Morrow', 'Quill', 'Tannin', 'Hollis', 'Juno', 'Rook', 'Pike', 'Sable', 'Wren', 'Ardent'];
-const SNAP_EVERY = 2; // send snapshots every 2 ticks (15 Hz)
+const SNAP_EVERY = 2; // 60 Hz simulation, snapshots every 2 ticks (30 Hz)
 
 export class Host {
   constructor(opts, send) {
@@ -55,6 +55,7 @@ export class Host {
         if (!p.alive || this.intermission) return;
         if (Array.isArray(m.p) && m.p.length === 3 && m.p.every(Number.isFinite)) p.p = m.p;
         if (Array.isArray(m.v) && m.v.length === 3) p.v = m.v;
+        p.onGround = !!m.g;
         p.yaw = +m.y || 0; p.pitch = +m.pi || 0;
         if (WEAPONS[m.w] && p.have[m.w]) p.w = m.w;
         break;
@@ -141,8 +142,9 @@ export class Host {
     if (W.ammo) p.ammo[W.ammo]--;
 
     if (W.kind === 'rocket') {
-      this.rockets.push({ id: this.nextRocket++, owner: p.id, p: [o[0] + d[0] * 0.6, o[1] + d[1] * 0.6, o[2] + d[2] * 0.6], v: [d[0] * W.speed, d[1] * W.speed, d[2] * W.speed], born: this.time });
-      this.broadcast({ t: 'fx', k: 'shot', w, owner: p.id, a: o, b: [] });
+      const r = { id: this.nextRocket++, owner: p.id, p: [o[0] + d[0] * 0.6, o[1] + d[1] * 0.6, o[2] + d[2] * 0.6], v: [d[0] * W.speed, d[1] * W.speed, d[2] * W.speed], born: this.time };
+      this.rockets.push(r);
+      this.broadcast({ t: 'fx', k: 'shot', w, owner: p.id, a: o, b: [], rk: [r.id, ...r.p, ...r.v] });
       return;
     }
 
@@ -273,7 +275,7 @@ export class Host {
     if (this.intermission) {
       if (this.time >= this.intermission) this.restart();
     } else {
-      if (this.tickNo % 30 === 0) this.checkEnd();
+      if (this.tickNo % 60 === 0) this.checkEnd();
       for (const p of this.players.values()) {
         if (!p.alive) { if (this.time >= p.respawnAt) this.spawn(p); continue; }
         if (p.bot) this.botThink(p, dt);
@@ -351,9 +353,10 @@ export class Host {
   sendSnapshots() {
     const pl = [];
     for (const p of this.players.values()) {
-      pl.push([p.id, +p.p[0].toFixed(3), +p.p[1].toFixed(3), +p.p[2].toFixed(3), +p.yaw.toFixed(3), +p.pitch.toFixed(3), p.w, p.alive ? 1 : 0, p.team]);
+      pl.push([p.id, +p.p[0].toFixed(3), +p.p[1].toFixed(3), +p.p[2].toFixed(3), +p.yaw.toFixed(3), +p.pitch.toFixed(3), p.w, p.alive ? 1 : 0, p.team,
+        +p.v[0].toFixed(2), +p.v[1].toFixed(2), +p.v[2].toFixed(2), p.onGround ? 1 : 0]);
     }
-    const rk = this.rockets.map(r => [r.id, +r.p[0].toFixed(2), +r.p[1].toFixed(2), +r.p[2].toFixed(2)]);
+    const rk = this.rockets.map(r => [r.id, +r.p[0].toFixed(2), +r.p[1].toFixed(2), +r.p[2].toFixed(2), +r.v[0].toFixed(1), +r.v[1].toFixed(1), +r.v[2].toFixed(1)]);
     const pk = this.pickups.map(x => (x.up ? 1 : 0)).join('');
     const remaining = Math.max(0, Math.round(this.timeLimit - (this.time - this.matchStart)));
     for (const p of this.players.values()) {

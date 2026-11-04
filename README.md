@@ -29,7 +29,7 @@ Requirements: a modern Chrome, Edge or Firefox, and internet access (to load the
 | Weapons | 1–5, mouse wheel, Q/E |
 | Scoreboard | Tab |
 | Chat | T |
-| Menu (sensitivity, FOV, volume, add/remove bots) | Esc |
+| Menu (graphics quality, sensitivity, FOV, volume, add/remove bots) | Esc |
 
 Rocket-jump by looking down, jumping and firing at your feet.
 
@@ -42,6 +42,16 @@ Rocket-jump by looking down, jumping and firing at your feet.
 5. **Rail Lance**: 90-damage instant beam.
 
 Pickups: health (+25), mega health (+100, up to 200), armor (+50), armor shards (+5) and ammo.
+
+## Performance
+
+Press **Esc** and pick a **Graphics quality**:
+
+- **High** adds glow effects (bloom) and sharp shadows.
+- **Medium** keeps shadows but turns off glow.
+- **Low** is for older PCs and laptops.
+
+The current frame rate is shown in the top-left corner.
 
 ## Running locally
 
@@ -60,4 +70,5 @@ Then open http://localhost:8000.
 - `js/host.js`: authoritative match simulation (damage, pickups, rockets, bots, scoring)
 - `js/host-worker.js`: runs the simulation in a Web Worker
 - `js/net.js`: PeerJS/WebRTC hosting and joining
-- `js/client.js`: Three.js rendering, input, movement prediction, HUD and synthesized audio
+- `js/gfx.js`: procedural textures, arena geometry, sky, player and weapon models, particles and decals
+- `js/client.js`: input, movement prediction, camera and weapon animation, HUD and synthesized audio
