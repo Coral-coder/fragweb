@@ -4,7 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>FragWeb Arena</title>
-  <meta name="description" content="A browser-based LAN arena shooter. No install — one player hosts, everyone else joins with a room code.">
+  <meta name="description" content="A browser-based arena shooter for LAN parties. No install — one player hosts, everyone else joins with a room code.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script type="importmap">
@@ -16,90 +18,154 @@
 </head>
 <body>
   <canvas id="view"></canvas>
+  <div id="loading" class="hidden"><div class="spinner"></div><p id="loading-text">Loading map…</p></div>
 
   <!-- ===================== MAIN MENU ===================== -->
   <div id="menu" class="screen">
-    <div class="panel">
-      <h1>FRAG<span>WEB</span></h1>
-      <p class="tag">Arena deathmatch in your browser. No install. Grab your friends.</p>
+    <div class="panel wide">
+      <header class="brand">
+        <h1>FRAG<span>WEB</span></h1>
+        <p class="tag">Arena combat in your browser. No install. Grab your friends.</p>
+      </header>
 
-      <label class="row">Your name
-        <input id="name" maxlength="16" placeholder="Player" autocomplete="off">
-      </label>
-
-      <div class="tabs">
-        <button class="tab active" data-tab="host">Host a game</button>
-        <button class="tab" data-tab="join">Join a game</button>
+      <div class="row2">
+        <label>Your name <input id="name" maxlength="16" placeholder="Player" autocomplete="off"></label>
       </div>
 
-      <div class="tabpane" id="tab-host">
-        <div class="grid2">
-          <label>Mode
-            <select id="mode">
-              <option value="ffa">Deathmatch (free-for-all)</option>
-              <option value="tdm">Team Deathmatch</option>
+      <nav class="tabs">
+        <button class="tab active" data-tab="host">Host</button>
+        <button class="tab" data-tab="join">Join</button>
+        <button class="tab" data-tab="settings">Settings</button>
+        <button class="tab" data-tab="help">How to play</button>
+      </nav>
+
+      <section class="tabpane" id="tab-host">
+        <h3>Map</h3>
+        <div id="maps" class="maps"></div>
+        <div class="grid3">
+          <label>Game mode <select id="mode"></select></label>
+          <label>Bots <input id="bots" type="number" min="0" max="15" value="5"></label>
+          <label>Bot skill
+            <select id="skill">
+              <option value="0">Novice</option>
+              <option value="1" selected>Skilled</option>
+              <option value="2">Adept</option>
+              <option value="3">Master</option>
             </select>
           </label>
-          <label>Bots
-            <input id="bots" type="number" min="0" max="10" value="3">
-          </label>
-          <label>Frag limit
-            <input id="fraglimit" type="number" min="5" max="200" value="25">
-          </label>
-          <label>Time limit (min)
-            <input id="timelimit" type="number" min="1" max="60" value="10">
-          </label>
+          <label id="lbl-frag">Frag limit <input id="fraglimit" type="number" min="5" max="200" value="25"></label>
+          <label id="lbl-cap" class="hidden">Capture limit <input id="caplimit" type="number" min="1" max="20" value="3"></label>
+          <label>Time limit (min) <input id="timelimit" type="number" min="2" max="60" value="12"></label>
         </div>
-        <button id="btn-host" class="primary">Host game</button>
-        <button id="btn-practice" class="secondary">Practice offline (just you + bots)</button>
-      </div>
+        <p id="mode-desc" class="hint"></p>
+        <h3>Mutators</h3>
+        <div id="muts" class="muts"></div>
+        <div class="actions">
+          <button id="btn-host" class="primary">Host game</button>
+          <button id="btn-practice" class="secondary">Practice offline</button>
+        </div>
+      </section>
 
-      <div class="tabpane hidden" id="tab-join">
+      <section class="tabpane hidden" id="tab-join">
         <label class="row">Room code
-          <input id="code" maxlength="5" placeholder="ABCDE" autocomplete="off" style="text-transform:uppercase">
+          <input id="code" maxlength="5" placeholder="ABCDE" autocomplete="off" style="text-transform:uppercase;font-size:28px;letter-spacing:6px;text-align:center">
         </label>
         <button id="btn-join" class="primary">Join game</button>
-      </div>
+        <p class="hint">The host sees the room code in the top-left corner of their screen, and in the Esc menu.</p>
+      </section>
+
+      <section class="tabpane hidden" id="tab-settings">
+        <div class="grid2">
+          <label>Mouse sensitivity <input id="sens" type="range" min="0.2" max="4" step="0.05"></label>
+          <label>Field of view <input id="fov" type="range" min="70" max="115" step="1"></label>
+          <label>Master volume <input id="vol" type="range" min="0" max="1" step="0.05"></label>
+          <label>Graphics quality
+            <select id="quality">
+              <option value="high">High — glow, sharp shadows</option>
+              <option value="medium">Medium — shadows, no glow</option>
+              <option value="low">Low — fastest</option>
+            </select>
+          </label>
+          <label>Crosshair colour <input id="xcolor" type="color" value="#ffffff"></label>
+          <label class="check"><input id="invert" type="checkbox"> Invert mouse Y</label>
+          <label class="check"><input id="voice" type="checkbox" checked> Announcer voice</label>
+          <label class="check"><input id="showfps" type="checkbox" checked> Show FPS</label>
+        </div>
+      </section>
+
+      <section class="tabpane hidden" id="tab-help">
+        <div class="help-grid">
+          <div>
+            <h3>Controls</h3>
+            <table class="keys">
+              <tr><td>WASD</td><td>Move</td></tr>
+              <tr><td>Space</td><td>Jump · press again in the air to double-jump</td></tr>
+              <tr><td>Double-tap WASD / Shift</td><td>Dodge</td></tr>
+              <tr><td>Left mouse</td><td>Primary fire</td></tr>
+              <tr><td>Right mouse</td><td>Alt-fire (hold for rocket volley / rail zoom)</td></tr>
+              <tr><td>1–8 · wheel · Q</td><td>Weapons · Q = last weapon</td></tr>
+              <tr><td>Tab</td><td>Scores</td></tr>
+              <tr><td>T / Y</td><td>Chat / team chat</td></tr>
+              <tr><td>Esc</td><td>Menu</td></tr>
+            </table>
+          </div>
+          <div>
+            <h3>Arsenal</h3>
+            <div id="weapon-help"></div>
+          </div>
+        </div>
+        <h3>Power-ups</h3>
+        <p class="hint">
+          <b class="c-amp">Damage Amplifier</b> doubles your damage for 30 s ·
+          <b class="c-aegis">Aegis Field</b> adds a 100-point shield ·
+          <b class="c-boots">Jump Boots</b> make you jump much higher ·
+          <b class="c-mega">Mega Health</b> +100 health · Armor absorbs two-thirds of damage.
+        </p>
+        <p class="hint">Hosting runs the match inside your browser tab — keep it open. Everyone needs internet briefly to find each other; after that, gameplay goes directly between PCs on your network.</p>
+        <p class="hint credits">Surface textures: CC0 from <a href="https://polyhaven.com" target="_blank" rel="noopener">Poly Haven</a>. Everything else is generated in code.</p>
+      </section>
 
       <p id="status" class="status"></p>
-
-      <details class="help">
-        <summary>Controls &amp; how it works</summary>
-        <ul>
-          <li><b>WASD</b> move · <b>Mouse</b> look · <b>Space</b> jump · <b>Click</b> fire</li>
-          <li><b>1–5</b> or <b>wheel</b> switch weapons · <b>Tab</b> scores · <b>T</b> chat · <b>Esc</b> menu</li>
-          <li>Rocket-jump: look down, jump and fire at your feet.</li>
-          <li>The host's browser runs the match. Keep the host's game open for the whole session.</li>
-          <li>Everyone needs internet briefly to find each other; gameplay then goes directly between the PCs.</li>
-        </ul>
-      </details>
     </div>
   </div>
 
   <!-- ===================== IN-GAME HUD ===================== -->
   <div id="hud" class="hidden">
+    <div id="scope" class="hidden"></div>
     <div id="crosshair"></div>
     <div id="hitmarker"></div>
     <div id="damage"></div>
+    <div id="dmgdirs"></div>
     <div id="topbar">
-      <span id="timer">10:00</span>
-      <span id="myscore"></span>
+      <div id="score-red" class="team-score t0 hidden"></div>
+      <div id="timer">10:00</div>
+      <div id="score-blue" class="team-score t1 hidden"></div>
+    </div>
+    <div id="myscore"></div>
+    <div id="flags" class="hidden">
+      <div class="flag t0"><span class="ico">⚑</span><span id="flag0">Home</span></div>
+      <div class="flag t1"><span class="ico">⚑</span><span id="flag1">Home</span></div>
     </div>
     <div id="room"></div>
     <div id="fps"></div>
     <div id="killfeed"></div>
-    <div id="center-msg"></div>
+    <div id="ann"></div>
+    <div id="notice"></div>
     <div id="pickup-msg"></div>
     <div id="chatlog"></div>
-    <input id="chatin" class="hidden" maxlength="120" placeholder="Say something… (Enter to send, Esc to cancel)">
+    <input id="chatin" class="hidden" maxlength="120">
     <div id="vitals">
       <div class="stat"><small>HEALTH</small><b id="hp">100</b></div>
       <div class="stat armor"><small>ARMOR</small><b id="ar">0</b></div>
+      <div class="stat shield hidden" id="sh-wrap"><small>SHIELD</small><b id="sh">0</b></div>
     </div>
+    <div id="powers"></div>
     <div id="weapons"></div>
-    <div id="ammo"><small id="wname">Sidearm</small><b id="ammocount">∞</b></div>
+    <div id="ammo"><small id="wname">Sidearm</small><b id="ammocount">∞</b><div id="pips"></div></div>
+    <div id="carry" class="hidden">YOU HAVE THE FLAG — RETURN TO BASE</div>
     <div id="dead" class="hidden"><h2>FRAGGED</h2><p id="deadby"></p><p id="respawn"></p></div>
     <div id="scoreboard" class="hidden"></div>
+    <div id="endscreen" class="hidden"></div>
     <div id="clicktoplay" class="hidden">Click to play</div>
   </div>
 
@@ -109,19 +175,18 @@
       <h2>Paused</h2>
       <div id="pause-room"></div>
       <button id="btn-resume" class="primary">Resume</button>
-      <label class="row">Graphics quality
-        <select id="quality">
-          <option value="high">High (glow effects, sharp shadows)</option>
-          <option value="medium">Medium (faster)</option>
-          <option value="low">Low (fastest, for older PCs)</option>
-        </select>
-      </label>
-      <label class="row">Mouse sensitivity <input id="sens" type="range" min="0.2" max="4" step="0.05" value="1"></label>
-      <label class="row">Field of view <input id="fov" type="range" min="70" max="110" step="1" value="95"></label>
-      <label class="row">Volume <input id="vol" type="range" min="0" max="1" step="0.05" value="0.6"></label>
+      <button id="btn-team" class="secondary hidden">Switch team</button>
       <div id="host-tools" class="hidden">
         <button id="btn-addbot" class="secondary">Add bot</button>
         <button id="btn-kickbot" class="secondary">Remove bot</button>
+      </div>
+      <div class="grid2 compact">
+        <label>Sensitivity <input id="sens2" type="range" min="0.2" max="4" step="0.05"></label>
+        <label>FOV <input id="fov2" type="range" min="70" max="115" step="1"></label>
+        <label>Volume <input id="vol2" type="range" min="0" max="1" step="0.05"></label>
+        <label>Quality
+          <select id="quality2"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+        </label>
       </div>
       <button id="btn-leave" class="danger">Leave game</button>
     </div>

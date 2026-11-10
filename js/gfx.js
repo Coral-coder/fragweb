@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { MAP, WEAPONS, PICKUP_INFO } from './game.js';
+import { WEAPONS, PICKUP_INFO } from './game.js';
 
 // ============================================================ procedural textures
 const TEX = 512;
@@ -222,33 +222,12 @@ function textureSet(kind, seed = 7) {
   return set;
 }
 
-export function makeMaterials() {
-  const std = (kind, o = {}) => {
-    const t = textureSet(kind);
-    const m = new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughness: 0.75, metalness: 0.3, ...o });
-    m.normalScale.set(1, 1);
-    return m;
-  };
-  return {
-    floor: std('floor', { roughness: 0.6, metalness: 0.55 }),
-    wall: std('wall', { emissiveMap: textureSet('wall').emissiveMap, emissive: 0xffffff, emissiveIntensity: 2, roughness: 0.7, metalness: 0.45 }),
-    tower: std('concrete', { color: 0xd8b8a8, roughness: 0.9, metalness: 0.05 }),
-    ledge: std('metal', { roughness: 0.45, metalness: 0.7 }),
-    dais: std('metal', { color: 0x9fb8d8, roughness: 0.4, metalness: 0.75 }),
-    step: std('concrete', { roughness: 0.92, metalness: 0.05 }),
-    block: std('concrete', { color: 0xb0c0d0, roughness: 0.88, metalness: 0.05 }),
-    pillar: std('concrete', { color: 0xe0c0a0, roughness: 0.88, metalness: 0.05 }),
-    crate: std('crate', { roughness: 0.7, metalness: 0.4 }),
-    trim: std('trim', { roughness: 0.55, metalness: 0.3 }),
-    cap: new THREE.MeshStandardMaterial({ color: 0x8a94a8, roughness: 0.3, metalness: 0.9 }),
-    glowOrange: new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff6a36).multiplyScalar(3) }),
-    glowBlue: new THREE.MeshBasicMaterial({ color: new THREE.Color(0x36c9ff).multiplyScalar(3) }),
-  };
-}
+// Procedural texture set (colour + normal + emissive) for things the photo textures don't cover.
+export function proceduralTexture(kind) { return textureSet(kind); }
 
 // ============================================================ geometry helpers
 // Box geometry with UVs scaled to world size (texture tiles every `tile` metres).
-function worldBox(sx, sy, sz, tile = 4) {
+export function worldBox(sx, sy, sz, tile = 4) {
   const g = new THREE.BoxGeometry(sx, sy, sz);
   const uv = g.attributes.uv;
   const dims = [[sz, sy], [sz, sy], [sx, sz], [sx, sz], [sx, sy], [sx, sy]];
@@ -258,157 +237,7 @@ function worldBox(sx, sy, sz, tile = 4) {
   }
   return g;
 }
-function placed(geo, x, y, z) { geo.translate(x, y, z); return geo; }
-
-// ============================================================ arena
-export function buildArena(scene, mats, quality) {
-  const groups = {};
-  const add = (k, geo) => { (groups[k] ||= []).push(geo); };
-
-  for (const b of MAP.boxes) {
-    const s = [0, 1, 2].map(i => b.max[i] - b.min[i]);
-    const c = [0, 1, 2].map(i => (b.min[i] + b.max[i]) / 2);
-    const tile = b.k === 'crate' ? Math.max(s[0], s[1], s[2]) : b.k === 'wall' ? 8 : 4;
-    add(b.k, placed(worldBox(s[0], s[1], s[2], tile), ...c));
-
-    // decorative trims: metal caps along top edges, hazard stripes on step fronts, glow strips
-    const top = b.max[1];
-    if (['ledge', 'dais', 'tower', 'block', 'pillar'].includes(b.k)) {
-      const t = 0.14;
-      add('cap', placed(new THREE.BoxGeometry(s[0] + 0.08, t, t), c[0], top - t / 2 + 0.02, b.min[2]));
-      add('cap', placed(new THREE.BoxGeometry(s[0] + 0.08, t, t), c[0], top - t / 2 + 0.02, b.max[2]));
-      add('cap', placed(new THREE.BoxGeometry(t, t, s[2] + 0.08), b.min[0], top - t / 2 + 0.02, c[2]));
-      add('cap', placed(new THREE.BoxGeometry(t, t, s[2] + 0.08), b.max[0], top - t / 2 + 0.02, c[2]));
-    }
-    if (b.k === 'step' && s[1] > 0.3) {
-      add('trim', placed(worldBox(s[0] + 0.01, 0.08, s[2] + 0.01, 1), c[0], top - 0.035, c[2]));
-    }
-    if (b.k === 'dais') {
-      for (const z of [b.min[2] - 0.02, b.max[2] + 0.02]) add('glowBlue', placed(new THREE.BoxGeometry(s[0] - 6, 0.08, 0.04), c[0], 1.2, z));
-      for (const x of [b.min[0] - 0.02, b.max[0] + 0.02]) add('glowBlue', placed(new THREE.BoxGeometry(0.04, 0.08, s[2]), x, 1.2, c[2]));
-    }
-    if (b.k === 'tower') {
-      const inX = c[0] > 0 ? b.min[0] - 0.02 : b.max[0] + 0.02;
-      const inZ = c[2] > 0 ? b.min[2] - 0.02 : b.max[2] + 0.02;
-      for (const y of [2, 4.5]) {
-        add('glowOrange', placed(new THREE.BoxGeometry(0.04, 0.1, s[2] - 1), inX, y, c[2]));
-        add('glowOrange', placed(new THREE.BoxGeometry(s[0] - 1, 0.1, 0.04), c[0], y, inZ));
-      }
-    }
-    if (b.k === 'ledge') {
-      const z = c[2] > 0 ? b.min[2] - 0.02 : b.max[2] + 0.02;
-      add('glowBlue', placed(new THREE.BoxGeometry(s[0] - 1, 0.06, 0.04), c[0], b.min[1] + 0.15, z));
-    }
-  }
-
-  // wall buttresses with vertical light strips (visual only)
-  const S = 32;
-  for (let i = -24; i <= 24; i += 8) {
-    for (const z of [-S, S]) {
-      const zz = z < 0 ? z + 0.4 : z - 0.4;
-      add('ledge', placed(worldBox(1.2, 22, 0.8), i, 11, zz));
-      add(i % 16 === 0 ? 'glowOrange' : 'glowBlue', placed(new THREE.BoxGeometry(0.12, 9, 0.05), i, 14, z < 0 ? zz + 0.42 : zz - 0.42));
-    }
-    for (const x of [-S, S]) {
-      const xx = x < 0 ? x + 0.4 : x - 0.4;
-      add('ledge', placed(worldBox(0.8, 22, 1.2), xx, 11, i));
-      add(i % 16 === 0 ? 'glowBlue' : 'glowOrange', placed(new THREE.BoxGeometry(0.05, 9, 0.12), x < 0 ? xx + 0.42 : xx - 0.42, 14, i));
-    }
-  }
-  // top rim of the arena walls
-  for (const z of [-S, S]) add('cap', placed(new THREE.BoxGeometry(2 * S + 2, 0.5, 1.6), 0, 22, z));
-  for (const x of [-S, S]) add('cap', placed(new THREE.BoxGeometry(1.6, 0.5, 2 * S + 2), x, 22, 0));
-  // horizontal light bands
-  for (const z of [-S + 0.02, S - 0.02]) add('glowOrange', placed(new THREE.BoxGeometry(2 * S - 4, 0.12, 0.04), 0, 12, z));
-  for (const x of [-S + 0.02, S - 0.02]) add('glowBlue', placed(new THREE.BoxGeometry(0.04, 0.12, 2 * S - 4), x, 12, 0));
-
-  // merge per material: a handful of draw calls instead of hundreds
-  for (const [k, geos] of Object.entries(groups)) {
-    const mesh = new THREE.Mesh(mergeGeometries(geos), mats[k] || mats.block);
-    const isGlow = k.startsWith('glow');
-    mesh.castShadow = !isGlow && k !== 'floor' && k !== 'wall';
-    mesh.receiveShadow = !isGlow;
-    scene.add(mesh);
-    geos.forEach(g => g.dispose());
-  }
-
-  // jump pads: housing, glowing disc, hazard ring, rising rings
-  const padMeshes = [];
-  const ringMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x8fe8ff).multiplyScalar(2), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
-  for (const pad of MAP.pads) {
-    const g = new THREE.Group();
-    const housing = new THREE.Mesh(new THREE.CylinderGeometry(pad.r + 0.35, pad.r + 0.45, 0.16, 40), mats.cap);
-    housing.receiveShadow = true;
-    const hazard = new THREE.Mesh(new THREE.RingGeometry(pad.r + 0.45, pad.r + 1.0, 40), mats.trim);
-    hazard.rotation.x = -Math.PI / 2; hazard.position.y = -0.07;
-    const disc = new THREE.Mesh(new THREE.CylinderGeometry(pad.r, pad.r, 0.18, 40), new THREE.MeshStandardMaterial({ color: 0x0a2030, emissive: 0x36c9ff, emissiveIntensity: 1.6, metalness: 0.5, roughness: 0.3 }));
-    g.add(housing, hazard, disc);
-    for (let i = 0; i < 3; i++) {
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(pad.r * 0.85, 0.035, 6, 40), ringMat.clone());
-      ring.rotation.x = Math.PI / 2;
-      ring.userData.phase = i / 3;
-      g.add(ring);
-    }
-    g.position.set(pad.p[0], pad.p[1] + 0.08, pad.p[2]);
-    scene.add(g);
-    padMeshes.push(g);
-  }
-  return { padMeshes };
-}
-
-// ============================================================ sky & skyline
-export function buildSky(scene) {
-  const skyGeo = new THREE.SphereGeometry(400, 32, 16);
-  const skyMat = new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { time: { value: 0 } },
-    vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }`,
-    fragmentShader: `
-      varying vec3 vDir; uniform float time;
-      float hash(vec3 p){ p = fract(p*0.3183099+.1); p*=17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
-      float noise(vec3 x){ vec3 i=floor(x); vec3 f=fract(x); f=f*f*(3.-2.*f);
-        return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
-                   mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z); }
-      void main(){
-        float h = vDir.y;
-        vec3 col = mix(vec3(0.10,0.06,0.10), vec3(0.02,0.03,0.08), smoothstep(-0.05,0.5,h));
-        col += vec3(0.55,0.22,0.10) * pow(max(0.,1.-abs(h)*3.5),3.) * 0.6; // horizon glow
-        float n = noise(vDir*3.0+vec3(time*0.01,0,0))*0.6 + noise(vDir*7.0)*0.4;
-        col += vec3(0.25,0.08,0.35) * smoothstep(0.45,0.9,n) * smoothstep(0.0,0.4,h) * 0.6; // nebula
-        float s = hash(floor(vDir*300.));
-        col += vec3(1.) * step(0.9975, s) * smoothstep(0.05,0.3,h);
-        // planet
-        vec3 pd = normalize(vec3(-0.5,0.35,-0.8));
-        float d = distance(vDir, pd);
-        col = mix(col, vec3(0.9,0.55,0.4)*(0.6+0.4*noise(vDir*20.)), smoothstep(0.125,0.12,d));
-        col += vec3(1.0,0.5,0.3)*0.25*smoothstep(0.25,0.12,d);
-        gl_FragColor = vec4(col,1.);
-      }`,
-  });
-  const sky = new THREE.Mesh(skyGeo, skyMat);
-  sky.renderOrder = -1;
-  scene.add(sky);
-
-  // distant industrial spires (silhouettes with lit windows)
-  const geos = [];
-  const winGeos = [];
-  const r = rng(99);
-  for (let i = 0; i < 46; i++) {
-    const a = (i / 46) * Math.PI * 2 + r() * 0.1;
-    const d = 90 + r() * 120;
-    const w = 6 + r() * 14, h = 30 + r() * 90;
-    const x = Math.cos(a) * d, z = Math.sin(a) * d;
-    geos.push(placed(new THREE.BoxGeometry(w, h, w), x, h / 2 - 5, z));
-    if (r() < 0.5) geos.push(placed(new THREE.CylinderGeometry(0.3, 0.3, 20, 4), x, h + 5, z));
-    for (let k = 0; k < 6; k++) {
-      winGeos.push(placed(new THREE.BoxGeometry(w + 0.2, 0.6, w + 0.2), x, 8 + r() * (h - 10), z));
-    }
-  }
-  const city = new THREE.Mesh(mergeGeometries(geos), new THREE.MeshStandardMaterial({ color: 0x141820, roughness: 1 }));
-  const lights = new THREE.Mesh(mergeGeometries(winGeos), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff9a50).multiplyScalar(1.5) }));
-  scene.add(city, lights);
-  return sky;
-}
+export function placed(geo, x, y, z) { geo.translate(x, y, z); return geo; }
 
 // ============================================================ shared model materials
 const M = {
@@ -512,7 +341,54 @@ const WEAPON_BUILDERS = [
     sidePlates(g, accent, 0.3, 0.05, 0.0, 0.02, 0.035);
     return { group: g, muzzle: new THREE.Vector3(0, 0.02, -0.58), parts: { spin } };
   },
-  // 3 — Rocket Launcher: shoulder tube with ammo window
+  // 3 — Arc Caster: open coil emitter with three prongs and a glowing capacitor
+  (accent) => {
+    const g = new THREE.Group();
+    g.add(profile([[0.2, -0.03], [-0.1, -0.03], [-0.13, 0.03], [-0.1, 0.07], [0.18, 0.07], [0.22, 0.03]], 0.08, M.gunmetal));
+    g.add(profile([[0.12, -0.03], [0.05, -0.03], [0.03, -0.15], [0.09, -0.16], [0.13, -0.05]], 0.045, M.polymer, 0.006));
+    g.add(at(cyl(0.05, 0.05, 0.18, M.armorDark, 20), 0, 0.02, -0.18));
+    const caps = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.2, 16), new THREE.MeshBasicMaterial({ color: new THREE.Color(accent).multiplyScalar(2.5), toneMapped: false }));
+    caps.rotation.z = Math.PI / 2; caps.position.set(0, 0.1, 0.02); g.add(caps);
+    const prongs = [];
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2 + Math.PI / 2;
+      const pr = rbox(0.014, 0.014, 0.2, 0.004, M.steel);
+      pr.position.set(Math.cos(a) * 0.04, 0.02 + Math.sin(a) * 0.04, -0.34);
+      pr.rotation.set(-Math.sin(a) * 0.25, Math.cos(a) * 0.25, 0);
+      g.add(pr);
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(accent).multiplyScalar(3), toneMapped: false }));
+      tip.position.set(Math.cos(a) * 0.065, 0.02 + Math.sin(a) * 0.065, -0.44);
+      prongs.push(tip); g.add(tip);
+    }
+    for (let i = 0; i < 4; i++) g.add(at(new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.006, 6, 18), M.steel), 0, 0.02, -0.1 - i * 0.045));
+    sidePlates(g, accent, 0.26, 0.05, 0.02, 0.02, 0.04);
+    return { group: g, muzzle: new THREE.Vector3(0, 0.02, -0.46), parts: { prongs, caps } };
+  },
+  // 4 — Shard Cannon: chunky drum-fed launcher with glowing heat vents
+  (accent) => {
+    const g = new THREE.Group();
+    g.add(profile([[0.2, -0.05], [-0.2, -0.05], [-0.24, 0.02], [-0.2, 0.09], [0.16, 0.09], [0.22, 0.04]], 0.11, M.gunmetal));
+    g.add(profile([[0.13, -0.05], [0.06, -0.05], [0.04, -0.17], [0.1, -0.18], [0.14, -0.07]], 0.05, M.polymer, 0.006));
+    const drum = new THREE.Group();
+    drum.add(cyl(0.075, 0.075, 0.12, M.armorDark, 10));
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      drum.add(at(cyl(0.015, 0.015, 0.125, glowMat(accent, 2), 6), Math.cos(a) * 0.05, Math.sin(a) * 0.05, 0));
+    }
+    drum.position.set(0, -0.06, 0.02); g.add(drum);
+    g.add(at(cyl(0.05, 0.065, 0.2, M.steel, 12), 0, 0.03, -0.32));
+    g.add(at(cyl(0.068, 0.068, 0.03, M.armorDark, 12), 0, 0.03, -0.43));
+    const vents = [];
+    for (let i = 0; i < 3; i++) {
+      for (const side of [-1, 1]) {
+        const v = rbox(0.006, 0.05, 0.015, 0.002, new THREE.MeshBasicMaterial({ color: new THREE.Color(accent).multiplyScalar(2), toneMapped: false }));
+        v.position.set(side * 0.062, 0.03, -0.12 + i * 0.04); vents.push(v); g.add(v);
+      }
+    }
+    g.add(at(rbox(0.03, 0.03, 0.1, 0.006, M.armorDark), 0, 0.12, -0.05));
+    return { group: g, muzzle: new THREE.Vector3(0, 0.03, -0.46), parts: { drum, vents } };
+  },
+  // 5 — Rocket Launcher: shoulder tube with ammo window
   (accent) => {
     const g = new THREE.Group();
     g.add(at(cyl(0.075, 0.075, 0.8, M.gunmetal, 24), 0, 0.03, -0.2));
@@ -524,9 +400,15 @@ const WEAPON_BUILDERS = [
     g.add(profile([[-0.3, -0.04], [-0.36, -0.04], [-0.37, -0.14], [-0.32, -0.15], [-0.29, -0.06]], 0.045, M.polymer, 0.006));
     g.add(at(rbox(0.05, 0.06, 0.12, 0.01, M.armorDark), -0.08, 0.1, -0.1)); // sight
     g.add(at(rbox(0.035, 0.035, 0.005, 0.003, glowMat(0xff4030, 3)), -0.08, 0.1, -0.162));
-    return { group: g, muzzle: new THREE.Vector3(0, 0.03, -0.64) };
+    // volley loading pips
+    const pips = [];
+    for (let i = 0; i < 3; i++) {
+      const pip = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), new THREE.MeshBasicMaterial({ color: 0x331100, toneMapped: false }));
+      pip.position.set(0.078, 0.07, 0.0 - i * 0.04); pips.push(pip); g.add(pip);
+    }
+    return { group: g, muzzle: new THREE.Vector3(0, 0.03, -0.64), parts: { pips } };
   },
-  // 4 — Rail Lance: twin rails with charging coils and scope
+  // 6 — Rail Lance: twin rails with charging coils and scope
   (accent) => {
     const g = new THREE.Group();
     g.add(profile([[0.2, -0.03], [-0.12, -0.03], [-0.14, 0.04], [0.18, 0.05], [0.22, 0.01]], 0.07, M.gunmetal));
@@ -545,6 +427,23 @@ const WEAPON_BUILDERS = [
     g.add(at(rbox(0.02, 0.05, 0.03, 0.004, M.gunmetal), 0, 0.075, -0.02));
     sidePlates(g, accent, 0.24, 0.04, 0.03, 0.01, 0.035);
     return { group: g, muzzle: new THREE.Vector3(0, 0.01, -0.74), parts: { coils } };
+  },
+  // 7 — Nova Charge: bulbous launcher with a live star-core visible in its chamber
+  (accent) => {
+    const g = new THREE.Group();
+    g.add(at(cyl(0.1, 0.085, 0.42, M.armorDark, 24), 0, 0.03, -0.12));
+    g.add(at(cyl(0.12, 0.12, 0.05, M.steel, 24), 0, 0.03, -0.35));
+    g.add(at(cyl(0.11, 0.1, 0.04, M.gunmetal, 24), 0, 0.03, 0.1));
+    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.06, 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(accent).multiplyScalar(4), toneMapped: false }));
+    core.position.set(0, 0.03, -0.12); g.add(core);
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const rib = rbox(0.018, 0.018, 0.36, 0.005, M.steel);
+      rib.position.set(Math.cos(a) * 0.1, 0.03 + Math.sin(a) * 0.1, -0.12); g.add(rib);
+    }
+    g.add(profile([[0.06, -0.06], [-0.01, -0.06], [-0.03, -0.18], [0.03, -0.19], [0.07, -0.08]], 0.05, M.polymer, 0.006));
+    g.add(at(rbox(0.04, 0.04, 0.008, 0.004, glowMat(0xffd040, 3)), -0.1, 0.12, -0.1));
+    return { group: g, muzzle: new THREE.Vector3(0, 0.03, -0.4), parts: { core } };
   },
 ];
 
@@ -672,6 +571,24 @@ export function buildPickup(t) {
     for (const x of [-0.36, 0.36]) item.add(at(rbox(0.18, 0.12, 0.26, 0.04, mat), x, 0.2, 0));
   } else if (t === 'shard') {
     const c = new THREE.Mesh(new THREE.OctahedronGeometry(0.22), mat); c.scale.y = 1.8; item.add(c);
+  } else if (t === 'vial') {
+    item.add(at(cyl(0.09, 0.09, 0.28, glowMat(col, 1.6), 14, 'y'), 0, 0, 0));
+    item.add(at(cyl(0.1, 0.1, 0.04, M.steel, 14, 'y'), 0, 0.15, 0));
+    item.add(at(cyl(0.1, 0.1, 0.04, M.steel, 14, 'y'), 0, -0.15, 0));
+    item.scale.setScalar(0.8);
+  } else if (t === 'aegis') {
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.42, 24, 16), new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.8, transparent: true, opacity: 0.45, metalness: 0.2, roughness: 0.1 }));
+    item.add(shell);
+    item.add(new THREE.Mesh(new THREE.OctahedronGeometry(0.18), glowMat(col, 3)));
+  } else if (t === 'amp') {
+    item.add(new THREE.Mesh(new THREE.TorusKnotGeometry(0.25, 0.07, 80, 10), new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 1.4, metalness: 0.6, roughness: 0.2 })));
+    item.add(new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), glowMat(0xffffff, 2)));
+  } else if (t === 'boots') {
+    for (const x of [-0.13, 0.13]) {
+      item.add(at(rbox(0.16, 0.22, 0.14, 0.04, mat), x, 0.06, 0));
+      item.add(at(rbox(0.18, 0.08, 0.32, 0.03, M.armorDark), x, -0.08, -0.06));
+      item.add(at(cyl(0.04, 0.05, 0.05, glowMat(col, 3), 10, 'y'), x, -0.15, 0.04));
+    }
   } else if (t[0] === 'w') {
     const w = buildWeapon(+t[1]);
     w.group.scale.setScalar(1.6);
@@ -878,4 +795,50 @@ export class LightPool {
       l.intensity = u.age >= u.life ? 0 : u.i0 * (1 - u.age / u.life) ** 2;
     }
   }
+}
+
+// ============================================================ power-up effects on players
+const bubbleGeo = new THREE.SphereGeometry(1.15, 24, 16);
+const bootsGeo = new THREE.TorusGeometry(0.32, 0.04, 6, 24);
+// Builds a small team-coloured flag that can be attached to a carrier's back.
+export function buildCarriedFlag(color) {
+  const g = new THREE.Group();
+  g.add(at(cyl(0.015, 0.015, 1.1, M.steel, 6, 'y'), 0, 0.55, 0));
+  const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.35, 6, 3), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.5, side: THREE.DoubleSide, roughness: 0.8 }));
+  cloth.position.set(0.28, 0.9, 0);
+  g.add(cloth);
+  g.userData.cloth = cloth;
+  return g;
+}
+// flags bitmask: 1 amp, 2 boots, 4 shield, 8 carrying flag, 16 spawn-protected
+export function setAvatarFx(avatar, flags, t, carryColor) {
+  const ud = avatar.userData;
+  if (!ud.fx) {
+    ud.fx = {};
+    ud.fx.bubble = new THREE.Mesh(bubbleGeo, new THREE.MeshBasicMaterial({ color: 0x7ab8ff, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false }));
+    ud.fx.boots = new THREE.Mesh(bootsGeo, glowMat(0x5cffd6, 3));
+    ud.fx.boots.rotation.x = Math.PI / 2; ud.fx.boots.position.y = -0.85;
+    ud.fx.amp = new THREE.Mesh(new THREE.SphereGeometry(1.0, 16, 12), new THREE.MeshBasicMaterial({ color: 0xc45cff, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false }));
+    avatar.add(ud.fx.bubble, ud.fx.boots, ud.fx.amp);
+  }
+  ud.fx.bubble.visible = !!(flags & 4);
+  ud.fx.boots.visible = !!(flags & 2);
+  ud.fx.amp.visible = !!(flags & 1);
+  if (flags & 1) { ud.fx.amp.material.opacity = 0.1 + Math.sin(t * 8) * 0.06; ud.fx.amp.scale.setScalar(1 + Math.sin(t * 5) * 0.05); }
+  if (flags & 4) ud.fx.bubble.material.opacity = 0.12 + Math.sin(t * 3) * 0.04;
+  // carried flag
+  if (flags & 8) {
+    if (!ud.fx.flag || ud.fx.flagColor !== carryColor) {
+      if (ud.fx.flag) ud.torso.remove(ud.fx.flag);
+      ud.fx.flag = buildCarriedFlag(carryColor);
+      ud.fx.flag.position.set(-0.1, 0.1, 0.32);
+      ud.fx.flag.rotation.z = 0.15;
+      ud.torso.add(ud.fx.flag);
+      ud.fx.flagColor = carryColor;
+    }
+    ud.fx.flag.visible = true;
+    ud.fx.flag.userData.cloth.rotation.y = Math.sin(t * 6) * 0.3;
+  } else if (ud.fx.flag) ud.fx.flag.visible = false;
+  // spawn protection: flicker
+  avatar.traverse && (avatar.userData.protFlicker = !!(flags & 16));
 }
